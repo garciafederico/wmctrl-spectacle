@@ -6,10 +6,10 @@ import os
 
 params = {
 	'maximize': [None],
-	'center': [1.0, 0.7],
+	'center': [0.90, 0.80, 0.663, 0.331],
 	'center-window': [None],
-	'left': [0.33, 0.5, 0.75],
-	'right': [0.33, 0.5, 0.75],
+    'left': [0.331, 0.499, 0.663],
+	'right': [0.331, 0.499, 0.663],
 }
 
 
@@ -58,7 +58,7 @@ def parseScreens(screensStr):
 	]
 	return sorted(
 		screens,
-		key=lambda item: item['offsetX']
+		key=lambda item: item['offsetX'],
 	)
 
 
@@ -93,15 +93,14 @@ def parseWindow(s):
 			ret['offsetY'] = parts[1]
 	return ret
 
-
-def getScreenIdx(screens, offsetX):
+def getScreenIdx(screens, centerX, centerY):
 	indexed = list(
 		enumerate(screens)
 	)
 	for i, screen in reversed(indexed):
-		if offsetX >= screen['offsetX']:
+		if centerX >= screen['offsetX'] and centerX <= screen['offsetX']+screen['width'] and centerY >= screen['offsetY'] and centerY <= screen['offsetY']+screen['height']:
 			return i
-
+	return 0
 
 def getOptionsIdx(mode):
 	filePath = '/tmp/spectacle-{}.txt'.format(mode)
@@ -127,24 +126,30 @@ winId = args[2]
 mode = args[3]
 
 # find out which screen the window is on
-screenIdx = getScreenIdx(screens, window['offsetX'])
+centerX = window['offsetX']+window['width']//2
+centerY = window['offsetY']+window['height']//2
+screenIdx = getScreenIdx(screens, centerX, centerY)
 
+# get current screen geometry
 offsetX = screens[screenIdx]['offsetX']
+offsetY = screens[screenIdx]['offsetY']
 width = screens[screenIdx]['width']
 height = screens[screenIdx]['height']
 isChrome = window['isChrome']
 
 optionIdx = getOptionsIdx(mode)
 
-removeMaximized = 'wmctrl -i -r :ACTIVE: -b remove,maximized_vert,maximized_horz'.replace(':ACTIVE:', winId)
-addMaximized = 'wmctrl -i -r :ACTIVE: -b add,maximized_vert,maximized_horz'.replace(':ACTIVE:', winId)
+removeMaximized = 'wmctrl -i -r :ACTIVE: -b remove,maximized'.replace(':ACTIVE:', winId)
+removeMaximizedVert = 'wmctrl -i -r :ACTIVE: -b remove,maximized_vert'.replace(':ACTIVE:', winId)
+addMaximized = 'wmctrl -i -r :ACTIVE: -b add,maximized'.replace(':ACTIVE:', winId)
 addMaximizedVert = 'wmctrl -i -r :ACTIVE: -b add,maximized_vert'.replace(':ACTIVE:', winId)
 
 cmd = None
 if (mode == 'center'):
 	heightFactor = params[mode][optionIdx]
-	fullHeight = (heightFactor == 1)
-	widthFactor = 0.75 if fullHeight else 0.5
+	fullHeight = (heightFactor == 0.9)
+#	widthFactor = 0.75 if fullHeight else 0.5
+	widthFactor = heightFactor
 	actualHeightFactor = heightFactor
 	if (fullHeight and isChrome):
 		actualHeightFactor = 0.5
@@ -155,7 +160,7 @@ if (mode == 'center'):
 	y = (height - h) * 0.5
 	cmd = combineCommands([
 		removeMaximized,
-		makeResizeCmd([0, offsetX + x, y, w, h], winId),
+		makeResizeCmd([0, offsetX + x, offsetY + y, w, h], winId),
 		addMaximizedVert if (isChrome and fullHeight) else ''
 	])
 
@@ -166,7 +171,7 @@ elif (mode == 'center-window'):
 	y = (height - h) * 0.5
 	cmd = combineCommands([
 		removeMaximized,
-		makeResizeCmd([0, offsetX + x, y, w, h], winId),
+		makeResizeCmd([0, offsetX + x, offsetY + y, w, h], winId),
 	])
 
 elif (mode == 'maximize'):
@@ -183,8 +188,8 @@ elif (mode == 'right'):
 	y = 0
 	cmd = combineCommands([
 		removeMaximized,
-		makeResizeCmd([0, offsetX + x, y, w, h], winId),
-		addMaximizedVert if (isChrome) else ''
+		makeResizeCmd([0, offsetX + x, offsetY + y, w, -1], winId),
+		addMaximizedVert
 	])
 
 elif (mode == 'left'):
@@ -196,8 +201,8 @@ elif (mode == 'left'):
 	y = 0
 	cmd = combineCommands([
 		removeMaximized,
-		makeResizeCmd([0, offsetX + x, y, w, h], winId),
-		addMaximizedVert if (isChrome) else ''
+		makeResizeCmd([0, offsetX + x, offsetY + y, w, -1], winId),
+		addMaximizedVert
 	])
 
 print(cmd)
